@@ -1,4 +1,5 @@
-#![allow(dead_code)] // Remove this once you start using the code
+#![allow(dead_code)]
+/// This module abstracts the terminal events (handled by crossterm)
 
 use std::{
     io::{stdout, Stdout},

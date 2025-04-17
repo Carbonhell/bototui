@@ -1,3 +1,4 @@
+use aws_config::SdkConfig;
 use color_eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
@@ -8,8 +9,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{action::Action, config::Config, tui::Event};
 
-pub mod fps;
 pub mod home;
+pub mod batch;
+pub mod logger;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///
@@ -39,6 +41,19 @@ pub trait Component {
     ///
     /// * `Result<()>` - An Ok result or an error.
     fn register_config_handler(&mut self, config: Config) -> Result<()> {
+        let _ = config; // to appease clippy
+        Ok(())
+    }
+    /// Register a configuration handler that provides AWS configuration settings if necessary.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - AWS SDK Configuration settings.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<()>` - An Ok result or an error.
+    fn register_aws_config_handler(&mut self, config: SdkConfig) -> Result<()> {
         let _ = config; // to appease clippy
         Ok(())
     }

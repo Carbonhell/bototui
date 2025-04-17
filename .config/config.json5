@@ -6,5 +6,15 @@
       "<Ctrl-c>": "Quit", // Yet another way to quit
       "<Ctrl-z>": "Suspend" // Suspend the application
     },
+    "Batch": {
+      "<q>": "Back", // Go back to the home screen
+      "<Ctrl-c>": "Quit", // Quit the application
+      "<Ctrl-z>": "Suspend" // Suspend the application
+    },
+    "Logger": {
+      "<q>": "Back", // Go back to the home screen
+      "<Ctrl-c>": "Quit", // Quit the application
+      "<Ctrl-z>": "Suspend" // Suspend the application
+    }
   }
 }

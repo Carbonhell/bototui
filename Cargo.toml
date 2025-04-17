@@ -1,7 +1,7 @@
 [package]
 name = "bototui"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "A rusty TUI for AWS"
 authors = ["Carbonhell <frafonia@gmail.com>"]
 build = "build.rs"
@@ -10,6 +10,9 @@ repository = "https://github.com/Carbonhell/bototui"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aws-config = "1.5.16"
+aws-sdk-batch = "1.5.16"
+chrono = "0.4.35"
 better-panic = "0.3.0"
 clap = { version = "4.5.20", features = [
     "derive",
@@ -41,6 +44,8 @@ tokio-util = "0.7.12"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "serde"] }
+tui-logger = "0.17.1"
+log = "0.4.26"
 
 [build-dependencies]
 anyhow = "1.0.90"

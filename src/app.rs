@@ -1,3 +1,6 @@
+use aws_config::SdkConfig;
+/// This module defines the App, which abstracts the terminal's event loop (handled by tui.rs) and renders Ratatui components.
+
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
@@ -7,15 +10,14 @@ use tracing::{debug, info};
 
 use crate::{
     action::Action,
-    components::{fps::FpsCounter, home::Home, Component},
+    components::{batch::Batch, home::Home, logger::Logger, Component},
     config::Config,
     tui::{Event, Tui},
 };
 
 pub struct App {
+    aws_config: SdkConfig,
     config: Config,
-    tick_rate: f64,
-    frame_rate: f64,
     components: Vec<Box<dyn Component>>,
     should_quit: bool,
     should_suspend: bool,
@@ -29,15 +31,20 @@ pub struct App {
 pub enum Mode {
     #[default]
     Home,
+    Batch,
+    Logger,
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
+    pub fn new(aws_config: SdkConfig) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         Ok(Self {
-            tick_rate,
-            frame_rate,
-            components: vec![Box::new(Home::new()), Box::new(FpsCounter::default())],
+            aws_config,
+            components: vec![
+                Box::new(Home::new()),
+                Box::new(Batch::new()),
+                Box::new(Logger::new()),
+            ],
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
@@ -49,10 +56,7 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let mut tui = Tui::new()?
-            // .mouse(true) // uncomment this line to enable mouse support
-            .tick_rate(self.tick_rate)
-            .frame_rate(self.frame_rate);
+        let mut tui = Tui::new()?;
         tui.enter()?;
 
         for component in self.components.iter_mut() {
@@ -60,6 +64,9 @@ impl App {
         }
         for component in self.components.iter_mut() {
             component.register_config_handler(self.config.clone())?;
+        }
+        for component in self.components.iter_mut() {
+            component.register_aws_config_handler(self.aws_config.clone())?;
         }
         for component in self.components.iter_mut() {
             component.init(tui.size()?)?;
@@ -89,19 +96,46 @@ impl App {
             return Ok(());
         };
         let action_tx = self.action_tx.clone();
+
+        // Handle system events first
         match event {
             Event::Quit => action_tx.send(Action::Quit)?,
             Event::Tick => action_tx.send(Action::Tick)?,
             Event::Render => action_tx.send(Action::Render)?,
             Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
-            Event::Key(key) => self.handle_key_event(key)?,
+            Event::Key(key) => {
+                // First check global keybindings
+                self.handle_key_event(key)?;
+
+                // If it's a key event, only send it to the active component
+                if matches!(event, Event::Key(_)) {
+                    let component_index = match self.mode {
+                        Mode::Home => 0,
+                        Mode::Batch => 1,
+                        Mode::Logger => 2,
+                    };
+
+                    if let Some(component) = self.components.get_mut(component_index) {
+                        if let Some(action) = component.handle_events(Some(event.clone()))? {
+                            action_tx.send(action)?;
+                        }
+                    }
+
+                    return Ok(());
+                }
+            },
             _ => {}
         }
-        for component in self.components.iter_mut() {
-            if let Some(action) = component.handle_events(Some(event.clone()))? {
-                action_tx.send(action)?;
+
+        // For non-key events, send to all components
+        if !matches!(event, Event::Key(_)) {
+            for component in self.components.iter_mut() {
+                if let Some(action) = component.handle_events(Some(event.clone()))? {
+                    action_tx.send(action)?;
+                }
             }
         }
+
         Ok(())
     }
 
@@ -145,6 +179,11 @@ impl App {
                 Action::ClearScreen => tui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(tui, w, h)?,
                 Action::Render => self.render(tui)?,
+                // Handle navigation actions
+                Action::NavigateToHome => self.mode = Mode::Home,
+                Action::NavigateToBatch => self.mode = Mode::Batch,
+                Action::NavigateToLogger => self.mode = Mode::Logger,
+                Action::Back => self.mode = Mode::Home,
                 _ => {}
             }
             for component in self.components.iter_mut() {
@@ -164,7 +203,15 @@ impl App {
 
     fn render(&mut self, tui: &mut Tui) -> Result<()> {
         tui.draw(|frame| {
-            for component in self.components.iter_mut() {
+            // Get the component index based on the current mode
+            let component_index = match self.mode {
+                Mode::Home => 0, // Home component is first in the vector
+                Mode::Batch => 1, // Batch component is second in the vector
+                Mode::Logger => 2, // Logger component is third in the vector
+            };
+
+            // Draw only the active component
+            if let Some(component) = self.components.get_mut(component_index) {
                 if let Err(err) = component.draw(frame, frame.area()) {
                     let _ = self
                         .action_tx

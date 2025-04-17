@@ -1,7 +1,6 @@
 #![allow(dead_code)] // Remove this once you start using the code
 
 use std::{collections::HashMap, env, path::PathBuf};
-
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use derive_deref::{Deref, DerefMut};
